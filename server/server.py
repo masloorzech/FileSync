@@ -9,8 +9,31 @@ MULTICAST_IP = "224.0.0.1"
 MULTICAST_PORT = 8000
 TCP_PORT = 5000
 
-def TCP_receiver():
-    pass
+
+def TCP_server():
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_socket.bind(('0.0.0.0',TCP_PORT))
+    server_socket.listen(5)
+
+    print("TCP server lisening on port: {TCP_PORT}".format(TCP_PORT=TCP_PORT))
+
+    while True:
+        conn, addr = server_socket.accept()
+        print("Connection address: {addr}".format(addr=addr))
+        try :
+            conn.sendall(b"Welcome to USP server!\n")
+            while True:
+                data = conn.recv(1024)
+                if not data:
+                    print(f"[TCP] {addr} disconnected.")
+                    break
+                print(f"[TCP] Received from {addr}: {data.decode()}")
+                conn.sendall(b"ACK\n")
+        except Exception as e:
+                print(f"[TCP] Error: {e}")
+        finally:
+            conn.close()
+
 
 def UDP_receiver():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
@@ -28,16 +51,16 @@ def UDP_receiver():
         type = protocols.protocol_get_type(msg)
         if type == protocols.PROTOCOLS.DISCOVER:
             offer_message = protocols.protocol_OFFER(TCP_PORT)
-            send_sock.sendto(offer_message.encode(), address)
-        else:
-            print("Still no DISCOVER received")
+            print("Received from ", address)
+            send_sock.sendto(offer_message.encode(), (MULTICAST_IP, MULTICAST_PORT))
 
-    pass
+
 
 if __name__ == '__main__':
     #todo handeling user input
     period = 60
+    TCP_server_thread = threading.Thread(target=TCP_server).start()
     thread = threading.Thread(target=UDP_receiver).start()
 
     while True:
-        sleep(1)
+        sleep(10)

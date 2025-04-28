@@ -8,9 +8,44 @@ import common.protocols as protocols
 MULTICAST_PORT = 8000
 MULTICAST_IP = "224.0.0.1"
 
+#GLOBAL VARIABLE
+TCP_SERVER_PORT = 0
+TCP_SERVER_IP = ""
+mutex = threading.Lock()
+
 tcp_connection_active = threading.Event()
 
+def TCP_connection():
+    global TCP_SERVER_PORT, TCP_SERVER_IP
+    while True:
+        tcp_connection_active.wait()
+        try:
+            with mutex:
+                print("TCP_SERVER_PORT:", TCP_SERVER_PORT)
+                print("TCP_SERVER_IP:", TCP_SERVER_IP)
+                TCP_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                try:
+                    TCP_socket.connect((TCP_SERVER_IP, TCP_SERVER_PORT))
+                    print("TCP connection established")
+
+                    while True:
+                        sleep(10)
+
+                except socket.timeout:
+                    print("[ERROR] TCP connection timed out")
+
+                finally:
+                    TCP_socket.close()
+                    print("[INFO] Zamknięcie połączenia")
+        except Exception as e:
+            print(f"[ERROR] Global error: {e}")
+            tcp_connection_active.clear()
+            sleep(10)
+
+
 def multicast_discoverer():
+    global TCP_SERVER_PORT
+    global TCP_SERVER_IP
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
     sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, struct.pack("b", 1))
 
@@ -41,7 +76,11 @@ def multicast_discoverer():
                 tcp_ip = addr[0]
                 tcp_port = offer_data["port"]
                 print(f"[DISCOVERY] Received OFFER from {tcp_ip}:{tcp_port}")
-                break
+                with mutex:
+                    TCP_SERVER_PORT = tcp_port
+                    TCP_SERVER_IP = tcp_ip
+                tcp_connection_active.set()
+
 
             sleep(10)
 
@@ -65,7 +104,7 @@ def fake_tcp_connection_simulator():
 if __name__ == "__main__":
     #open thread witch waits for connection
     threading.Thread(target=multicast_discoverer,  daemon=True).start()
-
+    threading.Thread(target=TCP_connection, daemon=True).start()
     while True:
         sleep(1)
 
