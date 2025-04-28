@@ -93,15 +93,6 @@ def multicast_discoverer():
             print(f"[DISCOVERY] Error: {e}")
             sleep(10)
 
-def fake_tcp_connection_simulator():
-    while True:
-        sleep(15)
-        print("[SIMULATION] TCP connection established")
-        tcp_connection_active.set()
-        sleep(10)
-        print("[SIMULATION] TCP connection lost")
-        tcp_connection_active.clear()
-
 if __name__ == "__main__":
     #open thread witch waits for connection
     threading.Thread(target=multicast_discoverer,  daemon=True).start()
