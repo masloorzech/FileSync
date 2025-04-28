@@ -15,32 +15,35 @@ mutex = threading.Lock()
 
 tcp_connection_active = threading.Event()
 
+
 def TCP_connection():
     global TCP_SERVER_PORT, TCP_SERVER_IP
     while True:
         tcp_connection_active.wait()
+        with mutex:
+            tcp_server_port = TCP_SERVER_PORT
+            tcp_server_ip = TCP_SERVER_IP
         try:
-            with mutex:
-                print("TCP_SERVER_PORT:", TCP_SERVER_PORT)
-                print("TCP_SERVER_IP:", TCP_SERVER_IP)
-                TCP_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            tcp_socket.connect((tcp_server_ip, tcp_server_port))
+            while True:
                 try:
-                    TCP_socket.connect((TCP_SERVER_IP, TCP_SERVER_PORT))
-                    print("TCP connection established")
+                    data = tcp_socket.recv(1024)
+                    if not data:
+                        print("[ERROR] TCP connection timed out")
+                        tcp_connection_active.clear()
+                        break
+                    print(data.decode())
 
-                    while True:
-                        sleep(10)
-
-                except socket.timeout:
+                except Exception as e:
                     print("[ERROR] TCP connection timed out")
+                    tcp_connection_active.clear()
+                    break
 
-                finally:
-                    TCP_socket.close()
-                    print("[INFO] Zamknięcie połączenia")
-        except Exception as e:
-            print(f"[ERROR] Global error: {e}")
+        except socket.timeout:
+            print("[ERROR] TCP connection timed out")
             tcp_connection_active.clear()
-            sleep(10)
+
 
 
 def multicast_discoverer():
@@ -65,7 +68,6 @@ def multicast_discoverer():
         try:
             print('Sending DISCOVERY')
             sock.sendto(message.encode(), (MULTICAST_IP, MULTICAST_PORT))
-            print("[DISCOVERY] Waiting for OFFER response...")
 
             msg, addr = recv_sock.recvfrom(1024)
 
@@ -80,7 +82,6 @@ def multicast_discoverer():
                     TCP_SERVER_PORT = tcp_port
                     TCP_SERVER_IP = tcp_ip
                 tcp_connection_active.set()
-
 
             sleep(10)
 
