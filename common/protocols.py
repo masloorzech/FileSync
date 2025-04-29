@@ -79,3 +79,8 @@ def protocol_NEXT_SYNC(next_sync_time):
         "type": "NEXT_SYNC",
         "next_sync_time": next_sync_time
     })
+
+def protocol_NOT_PROTOCOL_INFO():
+    return json.dumps({
+        "type": "NOT_PROTOCOL_INFO"
+    })

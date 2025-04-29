@@ -17,7 +17,6 @@ TCP_SERVER_IP = ""
 mutex = threading.Lock()
 
 tcp_connection_active = threading.Event()
-tcp_connection_lost = threading.Event()
 
 archive_folder_path =""
 unique_client_ID = ""
@@ -54,6 +53,8 @@ def TCP_sender(tcp_socket):
     while True:
         read_communication_node.wait()
         try:
+            message = protocols.protocol_NOT_PROTOCOL_INFO()
+
             protocol = get_protocol_form_receiver()
 
             if protocol == protocols.PROTOCOLS.NEXT_SYNC:
@@ -61,11 +62,12 @@ def TCP_sender(tcp_socket):
 
             if protocol == protocols.PROTOCOLS.READY:
                 message = protocols.protocol_ARCHIVE_INFO(unique_client_ID, files)
-                tcp_socket.send(message.encode())
 
             if protocol == protocols.PROTOCOLS.ARCHIVE_TASKS:
                 #TODO send files
                 pass
+
+            tcp_socket.send(message.encode())
             read_communication_node.clear()
 
         except socket.error as e:
@@ -80,7 +82,6 @@ def TCP_receiver(tcp_socket):
 
             if not data:
                 print("[ERROR] TCP connection closed by server")
-                tcp_connection_lost.set()
                 break
 
             protocol = protocols.protocol_get_type(data)
@@ -93,7 +94,6 @@ def TCP_receiver(tcp_socket):
 
         except socket.error as e:
             print(f"[ERROR TCP_receiver] TCP connection closed by server: {e}")
-            tcp_connection_lost.set()
             read_communication_node.set()
             return
 
@@ -123,18 +123,20 @@ def TCP_manager():
             continue
 
         #if program performend connection starts two threads one to send data one to receive data
+
         receiver = threading.Thread(target=TCP_receiver, args=(tcp_socket,))
         receiver.start()
+
         sender = threading.Thread(target=TCP_sender, args=(tcp_socket,))
         sender.start()
 
         sender.join()
         receiver.join()
 
-        tcp_connection_lost.clear()
+        tcp_socket.close()
 
         tcp_connection_active.clear()
-        tcp_socket.close()
+
 
 
 
