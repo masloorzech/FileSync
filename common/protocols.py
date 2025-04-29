@@ -1,7 +1,9 @@
+import base64
 import enum
 import json
 import os
 import time
+from datetime import datetime
 
 
 class PROTOCOLS(enum.Enum):
@@ -18,6 +20,9 @@ class PROTOCOLS(enum.Enum):
     NEXT_SYNC = "NEXT_SYNC"
 
     NOT_PROTOCOL_INFO = "NOT_PROTOCOL_INFO"
+
+def read_protocol_data(message: bytes):
+    return json.loads(message)
 
 def protocol_get_type(message: bytes) -> PROTOCOLS:
     try:
@@ -50,29 +55,50 @@ def protocol_READY():
 
 
 def protocol_ARCHIVE_INFO(client_id, files):
-    file_info = []
-
-    for file in files:
-        file_path = file['file_path']
-        last_modified_time = time.ctime(os.path.getmtime(file_path))
-        file_info.append({
-            "filename": file['filename'],
-            "file_path": file_path,
-            "last_modified": last_modified_time
-        })
-
     return json.dumps({
         "type": "ARCHIVE_INFO",
         "client_id": client_id,
+        "files": files
+    })
+
+def protocol_ARCHIVE_TASKS(files):
+    file_info = []
+
+    for file in files:
+        file_info.append({
+            "filename": file[0],
+            "file_path": file[1],
+        })
+    return json.dumps({
+        "type": "ARCHIVE_TASKS",
         "files": file_info
     })
 
-def protocol_ARCHIVE_TASKS(files_to_send):
-    return json.dumps({
-        "type": "ARCHIVE_TASKS",
-        "files_to_send": files_to_send
-    })
+def protocol_ARCHIVE_DATA(files, client_id,path):
+    files_data =[]
 
+    for file in files:
+
+        file_path = file['file_path']
+
+        mtime = os.path.getmtime(path+"\\"+file_path)
+        last_modified_time = datetime.fromtimestamp(mtime).isoformat()
+
+        with open(path+"\\"+file_path, "rb") as f:
+            encoded_content = base64.b64encode(f.read()).decode('utf-8')
+
+        files_data.append({
+            "filename": file['filename'],
+            "file_path": file_path,
+            "last_modified": last_modified_time,
+            "content": encoded_content
+        })
+
+    return json.dumps({
+        "type": "ARCHIVE_DATA",
+        "client_id": client_id,
+        "files_data": files_data
+    })
 
 def protocol_NEXT_SYNC(next_sync_time):
     return json.dumps({
