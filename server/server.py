@@ -1,7 +1,10 @@
+import json
+import os
 import queue
 import socket
 import struct
 import threading
+from datetime import datetime
 from time import sleep
 
 import common.protocols as protocols
@@ -14,6 +17,41 @@ client_queue = queue.Queue()
 current_client = None
 lock = threading.Lock()
 
+def compare_file_dates(client_file, server_file_path):
+    client_file_date = datetime.strptime(client_file["last_modified"], "%a %b %d %H:%M:%S %Y")
+
+    if os.path.exists(server_file_path):
+        server_file_date = datetime.fromtimestamp(os.path.getmtime(server_file_path))
+        return client_file_date > server_file_date
+    return True
+
+def create_client_folder(client_id, archive_base_path):
+    client_folder_path = os.path.join(archive_base_path, client_id)
+    if not os.path.exists(client_folder_path):
+        os.makedirs(client_folder_path)
+    return client_folder_path
+
+def handle_archive_info(data):
+    archive_info = json.loads(data)
+    print("Received archive info:", archive_info)
+    client_id = archive_info["client_id"]
+    files = archive_info["files"]
+    archive_folder = create_client_folder(client_id, "archive")
+
+    files_to_send = []
+
+    for file in files:
+        client_filename = file["filename"]
+        file_path = file["file_path"]
+        server_file_path = os.path.join(archive_folder, os.path.relpath(file_path, "archive"))
+
+        if compare_file_dates(file, server_file_path):
+            files_to_send.append((client_filename, file_path))
+        else:
+            continue
+
+        return files_to_send
+
 def handle_USP_service(conn, addr):
     global current_client
     try:
@@ -23,10 +61,16 @@ def handle_USP_service(conn, addr):
             if not data:
                 print(f"[{addr}] Connection closed.")
                 break
-            print(f"[{addr}] Received data: {data}")
-            conn.sendall(b"ACK\n")
-    except Exception as e:
-        print(f"[{addr}] Error: {e}")
+
+            print(f"[{addr}] Received data: {data.decode()}")
+
+            type = protocols.protocol_get_type(data)
+
+            if type == protocols.PROTOCOLS.ARCHIVE_INFO:
+                files_to_send = handle_archive_info(data.decode())
+                conn.sendall(protocols.protocol_ARCHIVE_TASKS(files_to_send).encode())
+
+
     finally:
         conn.close()
         with lock:
@@ -84,7 +128,6 @@ def UDP_receiver():
 
 
 if __name__ == '__main__':
-    #todo handeling user input
     period = 60
     TCP_server_thread = threading.Thread(target=TCP_server).start()
     thread = threading.Thread(target=UDP_receiver).start()
