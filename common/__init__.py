@@ -1,1 +1,1 @@
-__all__ = ["protocols", "net_sockets"]
+__all__ = ["protocols", "net_sockets", "shared_globals"]
