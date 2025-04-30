@@ -2,9 +2,15 @@ import base64
 import enum
 import json
 import os
-import time
 from datetime import datetime
 
+"""
+This file defines the structure and behavior of all protocol messages used in communication between clients/servers.
+
+    - Declares the PROTOCOLS enumeration containing supported protocol message types (e.g., DISCOVER, OFFER, ARCHIVE_DATA, etc.).
+    - Provides factory functions that generate JSON-encoded protocol messages for each supported action.
+    - Handles encoding/decoding, including reading protocol type, encoding files using base64, and embedding metadata (e.g., modification timestamps).
+"""
 
 # Enumeration of available protocol message types.
 class PROTOCOLS(enum.Enum):

@@ -1,6 +1,13 @@
 import socket
 import struct
 
+"""
+This file contains utility functions to create and configure UDP sockets for multicast communication:
+
+    - create_UDP_send_socket() — creates a socket for sending multicast messages (TTL = 1 to limit scope to local network, can be changed).
+    - create_UDP_receive_socket(ip, port) — joins a multicast group and binds a socket to receive messages on a specified port.
+"""
+
 # Creates a UDP socket for sending multicast messages.
 # Sets the multicast TTL (Time-To-Live) to 1, limiting the packet to the local network.
 def create_UDP_send_socket():
