@@ -19,18 +19,18 @@ def multicast_discoverer():
 
     message = protocols.protocol_DISCOVER()
     while True:
-        if runtime.next_sync_time_set.is_set():
+        if runtime.NEXT_SYNC_TIME_SET_SIGNAL.is_set():
             print(f"[INFO] Sleeping while waiting for next sync time: {datetime.fromtimestamp(runtime.next_sync_time).strftime("%Y-%m-%d %H:%M:%S")}")
             now = time.time()
             difference = runtime.next_sync_time - now
 
             if difference > 0:
                 sleep(difference)
-                runtime.next_sync_time_set.clear()
+                runtime.NEXT_SYNC_TIME_SET_SIGNAL.clear()
             else:
-                runtime.next_sync_time_set.clear()
+                runtime.NEXT_SYNC_TIME_SET_SIGNAL.clear()
 
-        if runtime.tcp_connection_active.is_set():
+        if runtime.TCP_CONNECTION_ACTIVE_SIGNAL.is_set():
             sleep(5)
             continue
 
@@ -48,13 +48,13 @@ def multicast_discoverer():
                 tcp_ip = addr[0]
                 tcp_port = offer_data["port"]
 
-                with runtime.mutex:
+                with runtime.TCP_INFORMATION_MUTEX:
                     runtime.TCP_SERVER_IP = tcp_ip
                     runtime.TCP_SERVER_PORT = tcp_port
 
                 print(f"[UDP INFO] Received OFFER from {tcp_ip}:{tcp_port}")
 
-                runtime.tcp_connection_active.set()
+                runtime.TCP_CONNECTION_ACTIVE_SIGNAL.set()
                 continue
 
             print("[UDP INFO] No OFFER received. Sleeping 10 seconds before retrying...")

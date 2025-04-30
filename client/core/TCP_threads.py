@@ -5,6 +5,8 @@ import threading
 import common.protocols as protocols
 import os
 
+# Collects file metadata from a given folder (recursively).
+# Returns a list of dictionaries with filename, relative path, and last modification time.
 def collect_files(folder_path):
     files = []
     for root, dirs, filenames in os.walk(folder_path):
@@ -24,21 +26,21 @@ def collect_files(folder_path):
     return files
 
 def send_data_to_sender(data):
-    with runtime.communication_node_mutex:
+    with runtime.PROTOCOL_DATA_COMMUNICATION_NODE_MUTEX:
         runtime.PROTOCOL_DATA_COMMUNICATION_NODE = data
 
 def get_data_form_receiver():
-    with runtime.communication_node_mutex:
+    with runtime.PROTOCOL_DATA_COMMUNICATION_NODE_MUTEX:
         return runtime.PROTOCOL_DATA_COMMUNICATION_NODE
 
 def TCP_manager(unique_client_ID, archive_folder_path ):
     while True:
 
         # waiting for signal form UDP about connection
-        runtime.tcp_connection_active.wait()
+        runtime.TCP_CONNECTION_ACTIVE_SIGNAL.wait()
 
         #after wait tries to create TCP socket
-        with runtime.mutex:
+        with runtime.TCP_INFORMATION_MUTEX:
             tcp_server_port = runtime.TCP_SERVER_PORT
             tcp_server_ip = runtime.TCP_SERVER_IP
 
@@ -51,7 +53,7 @@ def TCP_manager(unique_client_ID, archive_folder_path ):
             print("Cannot perform connection to TCP server {e}".format(e=e))
 
             #if program cannot perform connection tcp_connection flag is set to false
-            runtime.tcp_connection_active.clear()
+            runtime.TCP_CONNECTION_ACTIVE_SIGNAL.clear()
 
             continue
 
@@ -68,13 +70,13 @@ def TCP_manager(unique_client_ID, archive_folder_path ):
 
         tcp_socket.close()
 
-        runtime.read_communication_node.clear()
-        runtime.tcp_connection_active.clear()
+        runtime.PROTOCOL_DATA_COMMUNICATION_NODE_SIGNAL.clear()
+        runtime.TCP_CONNECTION_ACTIVE_SIGNAL.clear()
 
 def TCP_sender(tcp_socket, unique_client_ID, archive_folder_path):
 
     while True:
-        runtime.read_communication_node.wait()
+        runtime.PROTOCOL_DATA_COMMUNICATION_NODE_SIGNAL.wait()
         try:
 
             message = protocols.protocol_NOT_PROTOCOL_INFO()
@@ -85,7 +87,7 @@ def TCP_sender(tcp_socket, unique_client_ID, archive_folder_path):
 
             if protocol == protocols.PROTOCOLS.NEXT_SYNC:
                 runtime.next_sync_time = data["next_sync_time"]
-                runtime.next_sync_time_set.set()
+                runtime.NEXT_SYNC_TIME_SET_SIGNAL.set()
                 return
 
             if protocol == protocols.PROTOCOLS.READY:
@@ -101,7 +103,7 @@ def TCP_sender(tcp_socket, unique_client_ID, archive_folder_path):
 
             tcp_socket.send(message.encode())
 
-            runtime.read_communication_node.clear()
+            runtime.PROTOCOL_DATA_COMMUNICATION_NODE_SIGNAL.clear()
 
         except socket.error as e:
             print(f"[TCP ERROR TCP_sender] TCP connection closed by server: {e}")
@@ -124,12 +126,12 @@ def TCP_receiver(tcp_socket):
             if protocol != protocols.PROTOCOLS.BUSY:
                 send_data_to_sender(protocols.read_protocol_data(data))
                 if protocol == protocols.PROTOCOLS.NEXT_SYNC:
-                    runtime.read_communication_node.set()
+                    runtime.PROTOCOL_DATA_COMMUNICATION_NODE_SIGNAL.set()
                     return
 
-            runtime.read_communication_node.set()
+            runtime.PROTOCOL_DATA_COMMUNICATION_NODE_SIGNAL.set()
 
         except socket.error as e:
             print(f"[ERROR TCP_receiver] TCP connection closed by server: {e}")
-            runtime.read_communication_node.set()
+            runtime.PROTOCOL_DATA_COMMUNICATION_NODE_SIGNAL.set()
             return
