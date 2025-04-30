@@ -14,8 +14,8 @@ class PROTOCOLS(enum.Enum):
     BUSY = "BUSY"                         # Sent when the recipient is currently unavailable.
     READY = "READY"                       # Indicates readiness to begin data exchange.
 
-    ARCHIVE_INFO = "ARCHIVE_INFO"         # Contains information about archives available on the client.
-    ARCHIVE_TASKS = "ARCHIVE_TASKS"       # Contains a list of tasks (files) to be archived.
+    ARCHIVE_INFO = "ARCHIVE_INFO"         # Contains information about archives sends to the server, files that client want to save on the server.
+    ARCHIVE_TASKS = "ARCHIVE_TASKS"       # Contains a list of files to be archived.
     ARCHIVE_DATA = "ARCHIVE_DATA"         # Contains the actual encoded file data for archiving.
 
     NEXT_SYNC = "NEXT_SYNC"               # Suggests the time for the next synchronization.
