@@ -25,21 +25,25 @@ def collect_files(folder_path):
                 print(f"Error with: {file_path}: {e}")
     return files
 
+# Stores data in a thread-safe way to the shared communication node.
 def send_data_to_sender(data):
     with runtime.PROTOCOL_DATA_COMMUNICATION_NODE_MUTEX:
         runtime.PROTOCOL_DATA_COMMUNICATION_NODE = data
 
+# Retrieves data in a thread-safe way from the shared communication node.
 def get_data_form_receiver():
     with runtime.PROTOCOL_DATA_COMMUNICATION_NODE_MUTEX:
         return runtime.PROTOCOL_DATA_COMMUNICATION_NODE
 
+# Manages the TCP connection lifecycle.
+# Waits for a connection signal, opens a socket, and launches sender/receiver threads.
 def TCP_manager(unique_client_ID, archive_folder_path ):
     while True:
 
-        # waiting for signal form UDP about connection
+        # Wait for signal from UDP part that TCP connection should be established
         runtime.TCP_CONNECTION_ACTIVE_SIGNAL.wait()
 
-        #after wait tries to create TCP socket
+        # Read connection parameters safely
         with runtime.TCP_INFORMATION_MUTEX:
             tcp_server_port = runtime.TCP_SERVER_PORT
             tcp_server_ip = runtime.TCP_SERVER_IP
@@ -51,13 +55,10 @@ def TCP_manager(unique_client_ID, archive_folder_path ):
 
         except socket.error as e:
             print("Cannot perform connection to TCP server {e}".format(e=e))
-
-            #if program cannot perform connection tcp_connection flag is set to false
             runtime.TCP_CONNECTION_ACTIVE_SIGNAL.clear()
-
             continue
 
-        #if program performed connection starts two threads one to send data one to receive data
+        # Connection established – start sender and receiver threads
 
         receiver = threading.Thread(target=TCP_receiver, args=(tcp_socket,))
         receiver.start()
@@ -68,14 +69,17 @@ def TCP_manager(unique_client_ID, archive_folder_path ):
         sender.join()
         receiver.join()
 
+        # Cleanup after both threads finish
+
         tcp_socket.close()
 
         runtime.PROTOCOL_DATA_COMMUNICATION_NODE_SIGNAL.clear()
         runtime.TCP_CONNECTION_ACTIVE_SIGNAL.clear()
 
+# Handles sending data over the TCP socket based on the received protocol type.
 def TCP_sender(tcp_socket, unique_client_ID, archive_folder_path):
-
     while True:
+        # Wait until there is data to send
         runtime.PROTOCOL_DATA_COMMUNICATION_NODE_SIGNAL.wait()
         try:
 
@@ -85,15 +89,18 @@ def TCP_sender(tcp_socket, unique_client_ID, archive_folder_path):
 
             protocol = protocols.PROTOCOLS(data["type"])
 
+            # Handle sync time update
             if protocol == protocols.PROTOCOLS.NEXT_SYNC:
                 runtime.next_sync_time = data["next_sync_time"]
                 runtime.NEXT_SYNC_TIME_SET_SIGNAL.set()
                 return
 
+            # Prepare archive info
             if protocol == protocols.PROTOCOLS.READY:
                 files = collect_files(archive_folder_path)
                 message = protocols.protocol_ARCHIVE_INFO(unique_client_ID, files)
 
+            # Prepare archive data for sending
             if protocol == protocols.PROTOCOLS.ARCHIVE_TASKS:
                 files_to_send = data["files"]
                 message = protocols.protocol_ARCHIVE_DATA(files_to_send, client_id=unique_client_ID, path=archive_folder_path)
@@ -110,6 +117,7 @@ def TCP_sender(tcp_socket, unique_client_ID, archive_folder_path):
             return
 
 
+# Receives data over the TCP socket and notifies the system of new data.
 def TCP_receiver(tcp_socket):
     while True:
         try:
@@ -119,10 +127,12 @@ def TCP_receiver(tcp_socket):
                 print("[ERROR] TCP connection closed by server")
                 break
 
+            # Determine which protocol type was received
             protocol = protocols.protocol_get_type(data)
 
             print(f"[TCP INFO] TCP connection received: {protocols.PROTOCOLS(protocol)}")
 
+            # Store and signal received data
             if protocol != protocols.PROTOCOLS.BUSY:
                 send_data_to_sender(protocols.read_protocol_data(data))
                 if protocol == protocols.PROTOCOLS.NEXT_SYNC:
