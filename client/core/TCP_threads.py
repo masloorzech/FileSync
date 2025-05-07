@@ -87,30 +87,31 @@ def TCP_sender(tcp_socket, unique_client_ID, archive_folder_path):
 
             data = get_data_form_receiver()
 
-            protocol = protocols.PROTOCOLS(data["type"])
+            if data:
+                protocol = protocols.PROTOCOLS(data["type"])
 
-            # Handle sync time update
-            if protocol == protocols.PROTOCOLS.NEXT_SYNC:
-                runtime.next_sync_time = data["next_sync_time"]
-                runtime.NEXT_SYNC_TIME_SET_SIGNAL.set()
-                return
+                # Handle sync time update
+                if protocol == protocols.PROTOCOLS.NEXT_SYNC:
+                    runtime.next_sync_time = data["next_sync_time"]
+                    runtime.NEXT_SYNC_TIME_SET_SIGNAL.set()
+                    return
 
-            # Prepare archive info
-            if protocol == protocols.PROTOCOLS.READY:
-                files = collect_files(archive_folder_path)
-                message = protocols.protocol_ARCHIVE_INFO(unique_client_ID, files)
+                # Prepare archive info
+                if protocol == protocols.PROTOCOLS.READY:
+                    files = collect_files(archive_folder_path)
+                    message = protocols.protocol_ARCHIVE_INFO(unique_client_ID, files)
 
-            # Prepare archive data for sending
-            if protocol == protocols.PROTOCOLS.ARCHIVE_TASKS:
-                files_to_send = data["files"]
-                message = protocols.protocol_ARCHIVE_DATA(files_to_send, client_id=unique_client_ID, path=archive_folder_path)
+                # Prepare archive data for sending
+                if protocol == protocols.PROTOCOLS.ARCHIVE_TASKS:
+                    files_to_send = data["files"]
+                    message = protocols.protocol_ARCHIVE_DATA(files_to_send, client_id=unique_client_ID, path=archive_folder_path)
 
 
-            print(f"[TCP INFO] Sending message {message}")
+                print(f"[TCP INFO] Sending message {message}")
 
-            tcp_socket.send(message.encode())
+                tcp_socket.send(message.encode())
 
-            runtime.PROTOCOL_DATA_COMMUNICATION_NODE_SIGNAL.clear()
+                runtime.PROTOCOL_DATA_COMMUNICATION_NODE_SIGNAL.clear()
 
         except socket.error as e:
             print(f"[TCP ERROR TCP_sender] TCP connection closed by server: {e}")
@@ -145,3 +146,4 @@ def TCP_receiver(tcp_socket):
             print(f"[ERROR TCP_receiver] TCP connection closed by server: {e}")
             runtime.PROTOCOL_DATA_COMMUNICATION_NODE_SIGNAL.set()
             return
+    return
