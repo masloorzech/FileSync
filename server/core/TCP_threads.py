@@ -2,6 +2,8 @@ import queue
 import socket
 import threading
 from datetime import datetime, timedelta
+from time import sleep
+
 from . import protocols_handlers
 from common import protocols
 
@@ -18,33 +20,40 @@ CURRENT_CLIENT_MUTEX = threading.Lock()
 # It processes incoming requests, sends responses, and manages the file synchronization process.
 def handle_USP_service(conn, addr, sync_time):
     global CURRENT_CLIENT, CURRENT_CLIENT_MUTEX, CLIENT_QUEUE
+    data_buffer = bytearray()
     message = ""
     try:
         # Send a READY signal to the client to confirm readiness
         conn.sendall(protocols.protocol_READY().encode())
-
         while True:
             data = conn.recv(1024)
+
+            data_buffer += data
 
             # If no data is received, the connection has been closed by the client
             if not data:
                 print(f"[{addr}] Connection closed.")
                 break
 
-            print(f"[{addr}] Received data: {data.decode()}")
-
             # Decode the protocol type of the received message
-            type = protocols.protocol_get_type(data)
+
+            type = protocols.protocol_get_type(data_buffer)
+
+            if type==protocols.PROTOCOLS.NOT_PROTOCOL_INFO:
+                print(f"[{addr}] Data received: {data_buffer.decode()}")
+                continue
 
             # If the message is of type ARCHIVE_INFO, process the archive information
             if type == protocols.PROTOCOLS.ARCHIVE_INFO:
-                files_to_send = protocols_handlers.handle_archive_info(data.decode())
+                files_to_send = protocols_handlers.handle_archive_info(data_buffer.decode())
+                data_buffer.clear()
                 message = protocols.protocol_ARCHIVE_TASKS(files_to_send).encode()
                 conn.sendall(message)
 
             # If the message is of type ARCHIVE_DATA, process the archive data
             if type == protocols.PROTOCOLS.ARCHIVE_DATA:
-                protocols_handlers.handle_archive_data(data.decode())
+                protocols_handlers.handle_archive_data(data_buffer.decode())
+                data_buffer.clear()
                 timestamp = (datetime.now() + timedelta(seconds=sync_time)).timestamp()
                 message = protocols.protocol_NEXT_SYNC(timestamp).encode()
                 print(message)
