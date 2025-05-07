@@ -37,7 +37,7 @@ def read_protocol_data(message: bytes):
 # If the type field is missing or invalid, returns NOT_PROTOCOL_INFO.
 def protocol_get_type(message: bytes) -> PROTOCOLS:
     try:
-        json_message = json.loads(message)
+        json_message = json.loads(message.decode())
     except Exception as e:
         return PROTOCOLS.NOT_PROTOCOL_INFO
 
